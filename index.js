@@ -52,7 +52,7 @@ async function run() {
         const userCollection = client.db('parcelDb').collection('users')
         // const menuCollection = client.db('bistroDb').collection('menuCollection')
         // const reviewCollection = client.db('bistroDb').collection('reviews')
-        // const cartCollection = client.db('bistroDb').collection('carts');
+        const cartCollection = client.db('parcelDb').collection('carts');
         // const paymentCollection = client.db('bistroDb').collection('payments');
 
         //verify admin middleware
@@ -274,9 +274,9 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-    res.send('bistro boss is running')
+    res.send('parcel manager is running')
 })
 
 app.listen(port, () => {
-    console.log(`bistro boss server is running on port ${port}`)
+    console.log(`parcel management server is running on port ${port}`)
 })
