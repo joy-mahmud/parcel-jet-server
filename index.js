@@ -97,6 +97,22 @@ async function run() {
 
 
         })
+        //api for checking isDeliveryMan
+        app.get('/users/deliveryMan/:email', verifyToken, async (req, res) => {
+            const email = req.params.email
+            if (email !== req.decoded.email) {
+                return res.status(403).send({ message: 'anuthorized acccess' })
+            }
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+            let deliveryMan = false
+            if (user) {
+                deliveryMan = user?.role === 'delivery_man'
+            }
+            res.send({ deliveryMan })
+
+
+        })
 
         //user creation
         app.post('/users', async (req, res) => {
