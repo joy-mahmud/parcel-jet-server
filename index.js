@@ -113,6 +113,17 @@ async function run() {
 
 
         })
+        //api for checking order status
+        app.get('/cart/status/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            // if (email !== req.decoded.email) {
+            //     return res.status(403).send({ message: 'anuthorized acccess' })
+            // }
+            const query = { _id: new ObjectId(id) }
+            const item = await cartCollection.findOne(query)
+            const status = item.status
+            res.send({ status })
+        })
 
         //user creation
         app.post('/users', async (req, res) => {
@@ -155,49 +166,63 @@ async function run() {
         });
 
         //add menu item api
-        app.post('/menu',verifyToken,verifyAdmin, async(req,res)=>{
+        app.post('/menu', verifyToken, verifyAdmin, async (req, res) => {
             const item = req.body
             const result = await menuCollection.insertOne(item)
             res.send(result)
         })
         //get a menu item
-        app.get('/menu/:id',async(req,res)=>{
+        app.get('/cart/:id', async (req, res) => {
             const id = req.params.id
-            const query = {_id: new ObjectId(id)}
-            const result = await menuCollection.findOne(query)
+            const query = { _id: new ObjectId(id) }
+            const result = await cartCollection.findOne(query)
             res.send(result)
         })
 
         //update menu item
-        app.patch('/menu/:id', async(req,res)=>{
+        app.patch('/cart/:id', async (req, res) => {
             const item = req.body
             const id = req.params.id
-            const filter = {_id: new ObjectId(id)}
+            const filter = { _id: new ObjectId(id) }
             const updatedDoc = {
-                $set:{
-                    name:item.name,
-                    category:item.category,
-                    price:item.price,
-                    recipe:item.recipe,
-                    image:item.image
+                $set: {
+                    name: item.name,
+                    email: item.email,
+                    phone: item.phone,
+                    parcel_type: item.parcel_type,
+                    weight: item.weight,
+                    receiver_name: item.receiver_name,
+                    receiver_phone: item.receiver_phone,
+                    receiver_address: item.receiver_address,
+                    latitude: item.latitude,
+                    longitude: item.longitude,
+                    req_date: item.req_date,
+                    price: item.price,
+                    status:item.status
                 }
             }
-            const result = await menuCollection.updateOne(filter,updatedDoc)
+            const result = await cartCollection.updateOne(filter, updatedDoc)
             res.send(result)
         })
 
-        //delete a menu item
+        //change status of an order
 
-        app.delete('/menu/:id', verifyToken,verifyAdmin, async (req,res)=>{
-            const id = req.params.id 
-            const query = { _id: new ObjectId(id)}
-            const result = await menuCollection.deleteOne(query)
+        app.patch('/cart/cancel/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            const item = req.body
+            console.log(item)
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    status:item.status
+                }}
+            const  result = await cartCollection.updateOne(filter, updatedDoc)
             res.send(result)
         })
 
 
         //get for reviews data
-        app.get('/reviews' , async (req, res) => {
+        app.get('/reviews', async (req, res) => {
             const result = await reviewCollection.find().toArray()
             res.send(result)
         })
@@ -206,7 +231,7 @@ async function run() {
             const email = req.query.email
             const query = { email: email }
             const result = await cartCollection.find(query).toArray()
-           // console.log(result)
+            // console.log(result)
             res.send(result)
         })
         //post method to add to cart
@@ -223,60 +248,74 @@ async function run() {
             res.send(result)
         })
         //payment related api 
-        app.post('/payments', async(req,res)=>{
+        app.post('/payments', async (req, res) => {
             const payment = req.body
-            const paymentResult  = await paymentCollection.insertOne(payment)
-            
-            const query = {_id:{
-                $in: payment.cartIds.map(id=> new ObjectId(id))
-            }}
+            const paymentResult = await paymentCollection.insertOne(payment)
+
+            const query = {
+                _id: {
+                    $in: payment.cartIds.map(id => new ObjectId(id))
+                }
+            }
             const deleteResult = await cartCollection.deleteMany(query)
-            res.send({paymentResult,deleteResult})
+            res.send({ paymentResult, deleteResult })
         })
         //payment history
-        app.get('/paymentHistory/:email',verifyToken,async (req,res)=>{
+        app.get('/paymentHistory/:email', verifyToken, async (req, res) => {
             const email = req.params.email
-            const query = {email:email}
-            if(email!==req.decoded.email){
-                return res.status(403).send({message:'forbidden access'})
+            const query = { email: email }
+            if (email !== req.decoded.email) {
+                return res.status(403).send({ message: 'forbidden access' })
             }
             const result = await paymentCollection.find(query).toArray()
             res.send(result)
         })
         //admin stats
-        app.get('/admin-stats',verifyToken,verifyAdmin,async(req,res)=>{
+        app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
             const users = await userCollection.estimatedDocumentCount()
             const menuItems = await menuCollection.estimatedDocumentCount()
             const orders = await paymentCollection.estimatedDocumentCount()
             const result = await paymentCollection.aggregate([
                 {
-                    $group:{
-                       _id:null,
-                       totalRevenue:{
-                        $sum:'$price'
-                       }
+                    $group: {
+                        _id: null,
+                        totalRevenue: {
+                            $sum: '$price'
+                        }
                     }
                 }
             ]).toArray()
-            const revenue = result.length>0?result[0].totalRevenue:0
-            
-            res.send({users,menuItems,orders,revenue})
+            const revenue = result.length > 0 ? result[0].totalRevenue : 0
+
+            res.send({ users, menuItems, orders, revenue })
         })
         //stripe payment intent api
-        app.post('/create-payment-intent', async(req,res)=>{
-            const {price}=req.body
-            const amount = parseInt(price*100)
+        app.post('/create-payment-intent', async (req, res) => {
+            const { price } = req.body
+            const amount = parseInt(price * 100)
             console.log(amount)
             const paymentIntent = await stripe.paymentIntents.create({
-                amount:amount,
+                amount: amount,
                 currency: "usd",
                 payment_method_types: ['card']
-                   
+
             })
             res.send({
                 clientSecret: paymentIntent.client_secret
             })
         })
+        // //test code
+        // const currentDate = new Date('2023-11-30');
+        // const reqDate = new Date('2023-12-05')
+        // const currentDay = currentDate.getDate();
+        // const currentMonth=currentDate.getMonth()+1
+        // const currentYear = currentDate.getFullYear();
+        // const appro = currentDate.setDate(currentDay + 3);
+        // const approximate_date = currentDate.getDate()
+
+
+
+
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
