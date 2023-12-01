@@ -67,6 +67,18 @@ async function run() {
             }
             next()
         }
+        //verify dekiveryman middleware
+        const verifyDeliveryMan = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+            const isAdmin = user?.role === 'delivery_man'
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'forbidden access' })
+
+            }
+            next()
+        }
         //jwt related api 
         app.post('/jwt', async (req, res) => {
             const user = req.body
@@ -97,6 +109,25 @@ async function run() {
 
 
         })
+        // //api for getting user info
+        // app.get('users/profile/',async(req,res)=>{
+        //     const email = req.query.email
+        //     const query = {email:email}
+        //     const result = userCollection.findOne(query)
+        //     res.send(result)
+        // })
+
+        // app.patch('users/profile/',async(req,res)=>{
+        //     const email = req.query.email
+        //     const query = {email:email}
+        //     const updatedDoc ={
+        //         $set:{
+
+        //         }
+        //     }
+        //     const result = userCollection.findOne(query)
+        //     res.send(result)
+        // })
         //api for checking isDeliveryMan
         app.get('/users/deliveryMan/:email', verifyToken, async (req, res) => {
             const email = req.params.email
@@ -105,6 +136,7 @@ async function run() {
             }
             const query = { email: email }
             const user = await userCollection.findOne(query)
+            
             let deliveryMan = false
             if (user) {
                 deliveryMan = user?.role === 'delivery_man'
@@ -146,32 +178,29 @@ async function run() {
             res.send(result)
         })
 
-        //api to make a user as admin 
+        //api to make a user as admin or delivery man
         app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id
+            const role = req.body
             const filter = { _id: new ObjectId(id) }
             const updateDoc = {
                 $set: {
-                    role: 'admin'
+                    role: role.role
                 }
             }
             const result = await userCollection.updateOne(filter, updateDoc)
             res.send(result)
         })
 
-        //get request to find the all menu data
-        app.get('/menu', async (req, res) => {
-            const result = await menuCollection.find().toArray()
-            res.send(result)
-        });
+
 
         //add menu item api
-        app.post('/menu', verifyToken, verifyAdmin, async (req, res) => {
-            const item = req.body
-            const result = await menuCollection.insertOne(item)
-            res.send(result)
-        })
-        //get a menu item
+        // app.post('/menu', verifyToken, verifyAdmin, async (req, res) => {
+        //     const item = req.body
+        //     const result = await menuCollection.insertOne(item)
+        //     res.send(result)
+        // })
+        //get a parcel item
         app.get('/cart/:id', async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) }
@@ -179,7 +208,15 @@ async function run() {
             res.send(result)
         })
 
-        //update menu item
+        //get delivery list for a delivery man
+        app.get('/deliveryList/:id',verifyToken, verifyDeliveryMan,async(req,res)=>{
+            const id = req.params.id
+            const query = { delivery_man: id }
+            const result = await cartCollection.find(query).toArray()
+            res.send(result)
+        })
+
+        //update parcel item for user
         app.patch('/cart/:id', async (req, res) => {
             const item = req.body
             const id = req.params.id
@@ -198,25 +235,56 @@ async function run() {
                     longitude: item.longitude,
                     req_date: item.req_date,
                     price: item.price,
-                    status:item.status
+                    status: item.status
                 }
             }
             const result = await cartCollection.updateOne(filter, updatedDoc)
             res.send(result)
         })
-
-        //change status of an order
-
-        app.patch('/cart/cancel/:id', verifyToken, async (req, res) => {
+        //assign delivery man
+        app.patch('/assignDeliveryMan/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const item = req.body
             console.log(item)
             const filter = { _id: new ObjectId(id) }
             const updatedDoc = {
                 $set: {
-                    status:item.status
-                }}
-            const  result = await cartCollection.updateOne(filter, updatedDoc)
+                    status: item.status,
+                    approximate_date:item.approximate_date,
+                    delivery_man:item.delivery_man
+                }
+            }
+            const result = await cartCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
+        //get date for a range
+        // app.post('/getDate',async(req,res)=>{
+        //     const startDate = new Date (req.body.startDate)
+        //     const endDate = new Date (req.body.endDate)
+        //     console.log(startDate,endDate) 
+        //     const result = await cartCollection.find({
+        //         req_date:{
+        //             $gte:startDate,
+        //             $lte:endDate
+        //         }
+        //     }).toArray()
+        //     res.send(result)
+        // })
+
+
+        //change status of an order
+
+        app.patch('/cart/cancel/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            const item = req.body
+            // console.log(item)
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    status: item.status
+                }
+            }
+            const result = await cartCollection.updateOne(filter, updatedDoc)
             res.send(result)
         })
 
@@ -226,13 +294,46 @@ async function run() {
             const result = await reviewCollection.find().toArray()
             res.send(result)
         })
-        //get cart data
-        app.get('/cart', async (req, res) => {
+        //get cart data for a user 
+        app.get('/cart', verifyToken, async (req, res) => {
             const email = req.query.email
             const query = { email: email }
             const result = await cartCollection.find(query).toArray()
             // console.log(result)
             res.send(result)
+        })
+        // get all the orders for admin only
+        app.get('/orders', async (req, res) => {
+            const result = await cartCollection.find().toArray()
+            res.send(result)
+
+        })
+        //get all the deliverymens
+        app.get('/getDeliveryMen', verifyToken, verifyAdmin, async (req, res) => {
+            const query = { role: 'delivery_man' }
+            const result = await userCollection.find(query).toArray()
+            res.send(result)
+        })
+
+        //get a specific deliveryman
+        app.get('/deliveryman',verifyToken,verifyDeliveryMan, async(req,res)=>{
+            const email = req.query.email
+            const filter = {email:email}
+            const result = await userCollection.findOne(filter)
+            res.send(result)
+        })
+        //getAll users
+        app.get('/allusers',verifyToken,verifyAdmin, async(req,res)=>{
+            const allUsers = await userCollection.find().toArray()
+            const allOrderedUsers = await cartCollection.find().toArray()
+            const deliveryCount = allUsers.map((user)=>{
+                const matchedUser = allOrderedUsers.filter(item=>{
+                  if(item.email === user.email)
+                   {return item} 
+                })
+                return matchedUser.length
+            })
+            res.send({allUsers,deliveryCount})
         })
         //post method to add to cart
         app.post('/addtocart', async (req, res) => {
