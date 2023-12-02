@@ -50,10 +50,10 @@ async function run() {
         await client.connect();
 
         const userCollection = client.db('parcelDb').collection('users')
-        // const menuCollection = client.db('bistroDb').collection('menuCollection')
-        // const reviewCollection = client.db('bistroDb').collection('reviews')
+        const deliveredCollection = client.db('parcelDb').collection('delivered')
+         const reviewCollection = client.db('parcelDb').collection('reviews')
         const cartCollection = client.db('parcelDb').collection('carts');
-        // const paymentCollection = client.db('bistroDb').collection('payments');
+        // const paymentCollection = client.db('parcelDb').collection('payments');
 
         //verify admin middleware
         const verifyAdmin = async (req, res, next) => {
@@ -274,7 +274,7 @@ async function run() {
 
         //change status of an order
 
-        app.patch('/cart/cancel/:id', verifyToken, async (req, res) => {
+        app.patch('/order/status/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const item = req.body
             // console.log(item)
@@ -289,21 +289,46 @@ async function run() {
         })
 
 
-        //get for reviews data
+        //for reviews data
         app.get('/reviews', async (req, res) => {
             const result = await reviewCollection.find().toArray()
             res.send(result)
         })
+        app.post('/giveReview',async(req,res)=>{
+            const review = req.body
+            const result = await reviewCollection.insertOne(review)
+            res.send(result)
+        })
+        app.get('/getReviews/:id',verifyToken,verifyDeliveryMan,async(req,res)=>{
+            const id = req.params.id
+            const query = {deliveryManId:id}
+            const result = await reviewCollection.find(query).toArray()
+            res.send(result)
+        })
+
+
         //get cart data for a user 
         app.get('/cart', verifyToken, async (req, res) => {
             const email = req.query.email
+            const show = req.query.show
+           
             const query = { email: email }
             const result = await cartCollection.find(query).toArray()
+            if(show ==='showAll'){
+               
+                res.send(result)
+            }
+            else{
+                const parcels = result.filter(item => {
+                    return item.status === show
+                })
+                res.send(parcels)
+            }
             // console.log(result)
-            res.send(result)
+           
         })
         // get all the orders for admin only
-        app.get('/orders', async (req, res) => {
+        app.get('/orders',verifyToken,verifyAdmin, async (req, res) => {
             const result = await cartCollection.find().toArray()
             res.send(result)
 
@@ -348,6 +373,14 @@ async function run() {
             const result = await cartCollection.deleteOne(query)
             res.send(result)
         })
+
+        //delivery related api 
+        app.post('/delivered', async(req,res)=>{
+            const item = req.body
+            const result = await deliveredCollection.insertOne(item)
+            res.send(result)
+        })
+
         //payment related api 
         app.post('/payments', async (req, res) => {
             const payment = req.body
