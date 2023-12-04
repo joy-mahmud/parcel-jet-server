@@ -47,13 +47,13 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+         //await client.connect();
 
         const userCollection = client.db('parcelDb').collection('users')
         const deliveredCollection = client.db('parcelDb').collection('delivered')
-         const reviewCollection = client.db('parcelDb').collection('reviews')
+        const reviewCollection = client.db('parcelDb').collection('reviews')
         const cartCollection = client.db('parcelDb').collection('carts');
-        // const paymentCollection = client.db('parcelDb').collection('payments');
+         const paymentCollection = client.db('parcelDb').collection('payments');
 
         //verify admin middleware
         const verifyAdmin = async (req, res, next) => {
@@ -136,7 +136,7 @@ async function run() {
             }
             const query = { email: email }
             const user = await userCollection.findOne(query)
-            
+
             let deliveryMan = false
             if (user) {
                 deliveryMan = user?.role === 'delivery_man'
@@ -209,7 +209,7 @@ async function run() {
         })
 
         //get delivery list for a delivery man
-        app.get('/deliveryList/:id',verifyToken, verifyDeliveryMan,async(req,res)=>{
+        app.get('/deliveryList/:id', verifyToken, verifyDeliveryMan, async (req, res) => {
             const id = req.params.id
             const query = { delivery_man: id }
             const result = await cartCollection.find(query).toArray()
@@ -250,8 +250,8 @@ async function run() {
             const updatedDoc = {
                 $set: {
                     status: item.status,
-                    approximate_date:item.approximate_date,
-                    delivery_man:item.delivery_man
+                    approximate_date: item.approximate_date,
+                    delivery_man: item.delivery_man
                 }
             }
             const result = await cartCollection.updateOne(filter, updatedDoc)
@@ -290,18 +290,20 @@ async function run() {
 
 
         //for reviews data
-        app.get('/reviews', async (req, res) => {
-            const result = await reviewCollection.find().toArray()
+        app.get('/getTotalReviews', verifyToken, verifyAdmin, async (req, res) => {
+            const email = req.query.email
+            const filter = { email: email }
+            const result = await reviewCollection.find(filter).toArray()
             res.send(result)
         })
-        app.post('/giveReview',async(req,res)=>{
+        app.post('/giveReview', async (req, res) => {
             const review = req.body
             const result = await reviewCollection.insertOne(review)
             res.send(result)
         })
-        app.get('/getReviews/:id',verifyToken,verifyDeliveryMan,async(req,res)=>{
+        app.get('/getReviews/:id', verifyToken, verifyDeliveryMan, async (req, res) => {
             const id = req.params.id
-            const query = {deliveryManId:id}
+            const query = { deliveryManId: id }
             const result = await reviewCollection.find(query).toArray()
             res.send(result)
         })
@@ -311,24 +313,24 @@ async function run() {
         app.get('/cart', verifyToken, async (req, res) => {
             const email = req.query.email
             const show = req.query.show
-           
+
             const query = { email: email }
             const result = await cartCollection.find(query).toArray()
-            if(show ==='showAll'){
-               
+            if (show === 'showAll') {
+
                 res.send(result)
             }
-            else{
+            else {
                 const parcels = result.filter(item => {
                     return item.status === show
                 })
                 res.send(parcels)
             }
             // console.log(result)
-           
+
         })
         // get all the orders for admin only
-        app.get('/orders',verifyToken,verifyAdmin, async (req, res) => {
+        app.get('/orders', verifyToken, verifyAdmin, async (req, res) => {
             const result = await cartCollection.find().toArray()
             res.send(result)
 
@@ -341,24 +343,129 @@ async function run() {
         })
 
         //get a specific deliveryman
-        app.get('/deliveryman',verifyToken,verifyDeliveryMan, async(req,res)=>{
+        app.get('/deliveryman', verifyToken, verifyDeliveryMan, async (req, res) => {
             const email = req.query.email
-            const filter = {email:email}
+            const filter = { email: email }
             const result = await userCollection.findOne(filter)
             res.send(result)
         })
-        //getAll users
-        app.get('/allusers',verifyToken,verifyAdmin, async(req,res)=>{
-            const allUsers = await userCollection.find().toArray()
-            const allOrderedUsers = await cartCollection.find().toArray()
-            const deliveryCount = allUsers.map((user)=>{
-                const matchedUser = allOrderedUsers.filter(item=>{
-                  if(item.email === user.email)
-                   {return item} 
+        //getAll deliverymen
+        app.get('/getAllDeliverymen', verifyToken, verifyAdmin, async (req, res) => {
+            const query ={role:'delivery_man'}
+            const alldeliverymen = await userCollection.find(query).toArray()
+            const alldeliveries = await deliveredCollection.find().toArray()
+            const allReviews = await reviewCollection.find().toArray()
+            const deliveryCount = alldeliverymen.map((user) => {
+                const matchedUser = alldeliveries.filter(item => {
+                    if (item.email === user.email) { return item }
                 })
                 return matchedUser.length
             })
-            res.send({allUsers,deliveryCount})
+            const totalReviewCount = alldeliverymen.map(user=>{
+                const matchedUser = allReviews.filter(review=>{
+                    if(user._id==review.deliveryManId){
+                        return review.rating
+                    }
+                })
+                return matchedUser.length
+            })
+            const averageReview = deliveryCount.map((item,idx)=>{
+                 if(item===0){
+                    return 0
+                }
+                const avgFloat = totalReviewCount[idx]/item
+                const avgCount =avgFloat.toFixed(2)
+                return avgCount*100
+            })
+            const AverageRatingCount = alldeliverymen.map(user=>{
+                const usersRating = allReviews.filter(review=>{
+                    if(user._id==review.deliveryManId){
+                        return review.rating
+                    }
+                })
+                const totalrating = usersRating.reduce((total,item)=>{
+                   const totalRate= total+item.rating
+                   return totalRate
+                },0)
+                if(usersRating.length===0){
+                    return 0
+                }
+                const avgRating =totalrating/usersRating.length
+                return avgRating.toFixed(2)
+               
+            })
+        
+            res.send({ alldeliverymen, deliveryCount,averageReview,AverageRatingCount })
+        })
+        //top delivery man api
+        app.get('/topDeliveryMan',async(req,res)=>{
+            const query ={role:'delivery_man'}
+            const alldeliverymen = await userCollection.find(query).toArray()
+            const alldeliveries = await deliveredCollection.find().toArray()
+            const allReviews = await reviewCollection.find().toArray()
+            const deliveryCount = alldeliverymen.map((user) => {
+                const matchedUser = alldeliveries.filter(item => {
+                    if (item.email === user.email) { return item }
+                })
+                return matchedUser.length
+            })
+            // const delivermanIdArray = alldeliverymen.map(item=>item._id)
+            const length = deliveryCount.length;
+
+            for (let i = 0; i < length - 1; i++) {
+              for (let j = 0; j < length - i - 1; j++) {
+                if (deliveryCount[j] < deliveryCount[j + 1]) {
+                  
+                  const temp1 = deliveryCount[j];
+                  deliveryCount[j] = deliveryCount[j + 1];
+                  deliveryCount[j + 1] = temp1;
+                  const temp2 = alldeliverymen[j]
+                  alldeliverymen[j] = alldeliverymen[j + 1];
+                  alldeliverymen[j + 1] = temp2;
+                }
+              }
+            }
+            const AverageRatingCount = alldeliverymen.map(user=>{
+                const usersRating = allReviews.filter(review=>{
+                    if(user._id==review.deliveryManId){
+                        return review.rating
+                    }
+                })
+                const totalrating = usersRating.reduce((total,item)=>{
+                   const totalRate= total+item.rating
+                   return totalRate
+                },0)
+                if(usersRating.length===0){
+                    return 0
+                }
+                const avgRating =totalrating/usersRating.length
+                return avgRating.toFixed(2)
+               
+            })
+            const topDeliveryMen = alldeliverymen.slice(0,5)
+            const topDeliverycount = deliveryCount.slice(0,5)
+            const topAveragRating = AverageRatingCount.slice(0,5)
+            res.send({topDeliveryMen,topDeliverycount,topAveragRating})
+        })
+        //for pagination total users page
+        app.get('/usersCount', async(req,res)=>{
+            const count = await userCollection.estimatedDocumentCount()
+            res.send({count})
+        })
+
+        //getAll users
+        app.get('/allusers', verifyToken, verifyAdmin, async (req, res) => {
+            const page = parseInt(req.query.page)
+            const size = parseInt(req.query.size)
+            const allUsers = await userCollection.find().skip(page*size).limit(size).toArray()
+            const allOrderedUsers = await cartCollection.find().toArray()
+            const deliveryCount = allUsers.map((user) => {
+                const matchedUser = allOrderedUsers.filter(item => {
+                    if (item.email === user.email) { return item }
+                })
+                return matchedUser.length
+            })
+            res.send({ allUsers, deliveryCount })
         })
         //post method to add to cart
         app.post('/addtocart', async (req, res) => {
@@ -375,24 +482,37 @@ async function run() {
         })
 
         //delivery related api 
-        app.post('/delivered', async(req,res)=>{
+        app.post('/delivered', async (req, res) => {
             const item = req.body
             const result = await deliveredCollection.insertOne(item)
             res.send(result)
         })
+        //for top delivery man
 
-        //payment related api 
-        app.post('/payments', async (req, res) => {
+      
+
+        //home stats
+        app.get('/homeStats', async(req,res)=>{
+            const users = await userCollection.estimatedDocumentCount()
+            const totalDelivery = await deliveredCollection.estimatedDocumentCount()
+            const totalBooking = await cartCollection.estimatedDocumentCount()
+            
+            res.send({users,totalBooking,totalDelivery})
+        })
+        //admin stats
+    
+          //payment related api 
+          app.post('/payments', async (req, res) => {
             const payment = req.body
             const paymentResult = await paymentCollection.insertOne(payment)
 
-            const query = {
-                _id: {
-                    $in: payment.cartIds.map(id => new ObjectId(id))
-                }
-            }
-            const deleteResult = await cartCollection.deleteMany(query)
-            res.send({ paymentResult, deleteResult })
+            // const query = {
+            //     _id: {
+            //         $in: payment.cartIds.map(id => new ObjectId(id))
+            //     }
+            // }
+            // const deleteResult = await cartCollection.deleteMany(query)
+             res.send({ paymentResult })
         })
         //payment history
         app.get('/paymentHistory/:email', verifyToken, async (req, res) => {
@@ -403,25 +523,6 @@ async function run() {
             }
             const result = await paymentCollection.find(query).toArray()
             res.send(result)
-        })
-        //admin stats
-        app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
-            const users = await userCollection.estimatedDocumentCount()
-            const menuItems = await menuCollection.estimatedDocumentCount()
-            const orders = await paymentCollection.estimatedDocumentCount()
-            const result = await paymentCollection.aggregate([
-                {
-                    $group: {
-                        _id: null,
-                        totalRevenue: {
-                            $sum: '$price'
-                        }
-                    }
-                }
-            ]).toArray()
-            const revenue = result.length > 0 ? result[0].totalRevenue : 0
-
-            res.send({ users, menuItems, orders, revenue })
         })
         //stripe payment intent api
         app.post('/create-payment-intent', async (req, res) => {
@@ -447,13 +548,9 @@ async function run() {
         // const appro = currentDate.setDate(currentDay + 3);
         // const approximate_date = currentDate.getDate()
 
-
-
-
-
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // await client.db("admin").command({ ping: 1 });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
         //await client.close();
