@@ -53,6 +53,7 @@ async function run() {
         const deliveredCollection = client.db('parcelDb').collection('delivered')
         const reviewCollection = client.db('parcelDb').collection('reviews')
         const cartCollection = client.db('parcelDb').collection('carts');
+        const supportCollection = client.db('parcelDb').collection('getSupport');
          const paymentCollection = client.db('parcelDb').collection('payments');
 
         //verify admin middleware
@@ -498,6 +499,54 @@ async function run() {
             const totalBooking = await cartCollection.estimatedDocumentCount()
             
             res.send({users,totalBooking,totalDelivery})
+        })
+        //support related apis
+        app.post('/getSupport',async(req,res)=>{
+            const supportData = req.body
+            const result = await supportCollection.insertOne(supportData)
+             res.send(result)
+        })
+        app.get('/getUsermsg',verifyToken,verifyAdmin,async(req,res)=>{
+            const query = {status:'pending'}
+            const result = await supportCollection.find(query).toArray()
+            res.send(result)
+        })
+        app.patch('/provideSupport/:id',verifyToken,verifyAdmin, async(req,res)=>{
+            const id = req.params.id
+            const replyBody = req.body
+            const query = {_id: new ObjectId(id)}
+            const updatedDoc = {
+                $set: {
+                    status: replyBody.status,
+                    reply:replyBody.reply
+                }
+            }
+            const result = await supportCollection.updateOne(query,updatedDoc)
+            res.send(result)
+        })
+        app.get('/getReply', verifyToken, async(req,res)=>{
+            const email = req.query.email
+            const query ={email:email,status:'replied'}
+            const result = await supportCollection.find(query).toArray()
+            res.send(result)
+        })
+        //subscription related api
+        app.get('/isNewUser',verifyToken,async(req,res)=>{
+            const email = req.query.email
+            const query = {email:email}
+            const user = await userCollection.findOne(query)
+            const userCreationDate = new Date(user.signUpDate)
+            console.log(userCreationDate)
+            const currentDate = new Date()
+            const differenceInMilliseconds = Math.abs(currentDate - userCreationDate)
+            const millisecondsInADay = 1000 * 60 * 60 * 24
+            const differenceInDays = Math.floor(differenceInMilliseconds / millisecondsInADay);
+            let newUser=false;
+            if(differenceInDays<=10){
+                newUser=true;
+            }
+            console.log(newUser)
+            res.send({isNewUser:newUser})
         })
         //admin stats
     
