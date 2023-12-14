@@ -458,7 +458,8 @@ async function run() {
         app.get('/allusers', verifyToken, verifyAdmin, async (req, res) => {
             const page = parseInt(req.query.page)
             const size = parseInt(req.query.size)
-            const allUsers = await userCollection.find().skip(page*size).limit(size).toArray()
+            const query= {role:'user'}
+            const allUsers = await userCollection.find(query).skip(page*size).limit(size).toArray()
             const allOrderedUsers = await cartCollection.find().toArray()
             const deliveryCount = allUsers.map((user) => {
                 const matchedUser = allOrderedUsers.filter(item => {
