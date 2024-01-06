@@ -32,6 +32,7 @@ const verifyToken = (req, res, next) => {
 
 
 
+
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.7xouwts.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -47,14 +48,14 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-         //await client.connect();
+        //await client.connect();
 
         const userCollection = client.db('parcelDb').collection('users')
         const deliveredCollection = client.db('parcelDb').collection('delivered')
         const reviewCollection = client.db('parcelDb').collection('reviews')
         const cartCollection = client.db('parcelDb').collection('carts');
         const supportCollection = client.db('parcelDb').collection('getSupport');
-         const paymentCollection = client.db('parcelDb').collection('payments');
+        const paymentCollection = client.db('parcelDb').collection('payments');
 
         //verify admin middleware
         const verifyAdmin = async (req, res, next) => {
@@ -352,7 +353,7 @@ async function run() {
         })
         //getAll deliverymen
         app.get('/getAllDeliverymen', verifyToken, verifyAdmin, async (req, res) => {
-            const query ={role:'delivery_man'}
+            const query = { role: 'delivery_man' }
             const alldeliverymen = await userCollection.find(query).toArray()
             const alldeliveries = await deliveredCollection.find().toArray()
             const allReviews = await reviewCollection.find().toArray()
@@ -362,45 +363,45 @@ async function run() {
                 })
                 return matchedUser.length
             })
-            const totalReviewCount = alldeliverymen.map(user=>{
-                const matchedUser = allReviews.filter(review=>{
-                    if(user._id==review.deliveryManId){
+            const totalReviewCount = alldeliverymen.map(user => {
+                const matchedUser = allReviews.filter(review => {
+                    if (user._id == review.deliveryManId) {
                         return review.rating
                     }
                 })
                 return matchedUser.length
             })
-            const averageReview = deliveryCount.map((item,idx)=>{
-                 if(item===0){
+            const averageReview = deliveryCount.map((item, idx) => {
+                if (item === 0) {
                     return 0
                 }
-                const avgFloat = totalReviewCount[idx]/item
-                const avgCount =avgFloat.toFixed(2)
-                return avgCount*100
+                const avgFloat = totalReviewCount[idx] / item
+                const avgCount = avgFloat.toFixed(2)
+                return avgCount * 100
             })
-            const AverageRatingCount = alldeliverymen.map(user=>{
-                const usersRating = allReviews.filter(review=>{
-                    if(user._id==review.deliveryManId){
+            const AverageRatingCount = alldeliverymen.map(user => {
+                const usersRating = allReviews.filter(review => {
+                    if (user._id == review.deliveryManId) {
                         return review.rating
                     }
                 })
-                const totalrating = usersRating.reduce((total,item)=>{
-                   const totalRate= total+item.rating
-                   return totalRate
-                },0)
-                if(usersRating.length===0){
+                const totalrating = usersRating.reduce((total, item) => {
+                    const totalRate = total + item.rating
+                    return totalRate
+                }, 0)
+                if (usersRating.length === 0) {
                     return 0
                 }
-                const avgRating =totalrating/usersRating.length
+                const avgRating = totalrating / usersRating.length
                 return avgRating.toFixed(2)
-               
+
             })
-        
-            res.send({ alldeliverymen, deliveryCount,averageReview,AverageRatingCount })
+
+            res.send({ alldeliverymen, deliveryCount, averageReview, AverageRatingCount })
         })
         //top delivery man api
-        app.get('/topDeliveryMan',async(req,res)=>{
-            const query ={role:'delivery_man'}
+        app.get('/topDeliveryMan', async (req, res) => {
+            const query = { role: 'delivery_man' }
             const alldeliverymen = await userCollection.find(query).toArray()
             const alldeliveries = await deliveredCollection.find().toArray()
             const allReviews = await reviewCollection.find().toArray()
@@ -414,52 +415,52 @@ async function run() {
             const length = deliveryCount.length;
 
             for (let i = 0; i < length - 1; i++) {
-              for (let j = 0; j < length - i - 1; j++) {
-                if (deliveryCount[j] < deliveryCount[j + 1]) {
-                  
-                  const temp1 = deliveryCount[j];
-                  deliveryCount[j] = deliveryCount[j + 1];
-                  deliveryCount[j + 1] = temp1;
-                  const temp2 = alldeliverymen[j]
-                  alldeliverymen[j] = alldeliverymen[j + 1];
-                  alldeliverymen[j + 1] = temp2;
+                for (let j = 0; j < length - i - 1; j++) {
+                    if (deliveryCount[j] < deliveryCount[j + 1]) {
+
+                        const temp1 = deliveryCount[j];
+                        deliveryCount[j] = deliveryCount[j + 1];
+                        deliveryCount[j + 1] = temp1;
+                        const temp2 = alldeliverymen[j]
+                        alldeliverymen[j] = alldeliverymen[j + 1];
+                        alldeliverymen[j + 1] = temp2;
+                    }
                 }
-              }
             }
-            const AverageRatingCount = alldeliverymen.map(user=>{
-                const usersRating = allReviews.filter(review=>{
-                    if(user._id==review.deliveryManId){
+            const AverageRatingCount = alldeliverymen.map(user => {
+                const usersRating = allReviews.filter(review => {
+                    if (user._id == review.deliveryManId) {
                         return review.rating
                     }
                 })
-                const totalrating = usersRating.reduce((total,item)=>{
-                   const totalRate= total+item.rating
-                   return totalRate
-                },0)
-                if(usersRating.length===0){
+                const totalrating = usersRating.reduce((total, item) => {
+                    const totalRate = total + item.rating
+                    return totalRate
+                }, 0)
+                if (usersRating.length === 0) {
                     return 0
                 }
-                const avgRating =totalrating/usersRating.length
+                const avgRating = totalrating / usersRating.length
                 return avgRating.toFixed(2)
-               
+
             })
-            const topDeliveryMen = alldeliverymen.slice(0,5)
-            const topDeliverycount = deliveryCount.slice(0,5)
-            const topAveragRating = AverageRatingCount.slice(0,5)
-            res.send({topDeliveryMen,topDeliverycount,topAveragRating})
+            const topDeliveryMen = alldeliverymen.slice(0, 5)
+            const topDeliverycount = deliveryCount.slice(0, 5)
+            const topAveragRating = AverageRatingCount.slice(0, 5)
+            res.send({ topDeliveryMen, topDeliverycount, topAveragRating })
         })
         //for pagination total users page
-        app.get('/usersCount', async(req,res)=>{
+        app.get('/usersCount', async (req, res) => {
             const count = await userCollection.estimatedDocumentCount()
-            res.send({count})
+            res.send({ count })
         })
 
         //getAll users
         app.get('/allusers', verifyToken, verifyAdmin, async (req, res) => {
             const page = parseInt(req.query.page)
             const size = parseInt(req.query.size)
-            const query= {role:'user'}
-            const allUsers = await userCollection.find(query).skip(page*size).limit(size).toArray()
+            const query = { role: 'user' }
+            const allUsers = await userCollection.find(query).skip(page * size).limit(size).toArray()
             const allOrderedUsers = await cartCollection.find().toArray()
             const deliveryCount = allUsers.map((user) => {
                 const matchedUser = allOrderedUsers.filter(item => {
@@ -491,50 +492,50 @@ async function run() {
         })
         //for top delivery man
 
-      
+
 
         //home stats
-        app.get('/homeStats', async(req,res)=>{
+        app.get('/homeStats', async (req, res) => {
             const users = await userCollection.estimatedDocumentCount()
             const totalDelivery = await deliveredCollection.estimatedDocumentCount()
             const totalBooking = await cartCollection.estimatedDocumentCount()
-            
-            res.send({users,totalBooking,totalDelivery})
+
+            res.send({ users, totalBooking, totalDelivery })
         })
         //support related apis
-        app.post('/getSupport',async(req,res)=>{
+        app.post('/getSupport', async (req, res) => {
             const supportData = req.body
             const result = await supportCollection.insertOne(supportData)
-             res.send(result)
+            res.send(result)
         })
-        app.get('/getUsermsg',verifyToken,verifyAdmin,async(req,res)=>{
-            const query = {status:'pending'}
+        app.get('/getUsermsg', verifyToken, verifyAdmin, async (req, res) => {
+            const query = { status: 'pending' }
             const result = await supportCollection.find(query).toArray()
             res.send(result)
         })
-        app.patch('/provideSupport/:id',verifyToken,verifyAdmin, async(req,res)=>{
+        app.patch('/provideSupport/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const replyBody = req.body
-            const query = {_id: new ObjectId(id)}
+            const query = { _id: new ObjectId(id) }
             const updatedDoc = {
                 $set: {
                     status: replyBody.status,
-                    reply:replyBody.reply
+                    reply: replyBody.reply
                 }
             }
-            const result = await supportCollection.updateOne(query,updatedDoc)
+            const result = await supportCollection.updateOne(query, updatedDoc)
             res.send(result)
         })
-        app.get('/getReply', verifyToken, async(req,res)=>{
+        app.get('/getReply', verifyToken, async (req, res) => {
             const email = req.query.email
-            const query ={email:email,status:'replied'}
+            const query = { email: email, status: 'replied' }
             const result = await supportCollection.find(query).toArray()
             res.send(result)
         })
         //subscription related api
-        app.get('/isNewUser',verifyToken,async(req,res)=>{
+        app.get('/isNewUser', verifyToken, async (req, res) => {
             const email = req.query.email
-            const query = {email:email}
+            const query = { email: email }
             const user = await userCollection.findOne(query)
             const userCreationDate = new Date(user.signUpDate)
             console.log(userCreationDate)
@@ -542,17 +543,24 @@ async function run() {
             const differenceInMilliseconds = Math.abs(currentDate - userCreationDate)
             const millisecondsInADay = 1000 * 60 * 60 * 24
             const differenceInDays = Math.floor(differenceInMilliseconds / millisecondsInADay);
-            let newUser=false;
-            if(differenceInDays<=10){
-                newUser=true;
+            let newUser = false;
+            if (differenceInDays <= 10) {
+                newUser = true;
             }
             console.log(newUser)
-            res.send({isNewUser:newUser})
+            res.send({ isNewUser: newUser })
+        })
+        //cart api
+        app.get('/cart/due/:email', async(req,res)=>{
+            const email = req.params.email
+          const query = {email:email,pay_status:'due'}
+          const result = await cartCollection.find(query).toArray()
+          res.send(result)
         })
         //admin stats
-    
-          //payment related api 
-          app.post('/payments', async (req, res) => {
+
+        //payment related api 
+        app.post('/payments', async (req, res) => {
             const payment = req.body
             const paymentResult = await paymentCollection.insertOne(payment)
 
@@ -562,7 +570,7 @@ async function run() {
             //     }
             // }
             // const deleteResult = await cartCollection.deleteMany(query)
-             res.send({ paymentResult })
+            res.send({ paymentResult })
         })
         //payment history
         app.get('/paymentHistory/:email', verifyToken, async (req, res) => {
@@ -578,7 +586,7 @@ async function run() {
         app.post('/create-payment-intent', async (req, res) => {
             const { price } = req.body
             const amount = parseInt(price * 100)
-            console.log(amount)
+            // console.log(amount)
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: amount,
                 currency: "usd",
@@ -588,6 +596,22 @@ async function run() {
             res.send({
                 clientSecret: paymentIntent.client_secret
             })
+        })
+        app.patch('/cart/paid/:email',verifyToken,async(req,res)=>{
+            const email = req.params.email
+            const paymentInfo = req.body
+            const cartiIds = paymentInfo.cartIds
+            const objectIds = cartiIds.map(id=>new ObjectId(id))
+            console.log(objectIds)
+            const query = {_id:{
+                $in:objectIds
+            }}
+            const updatedDoc = {
+                $set:{pay_status:paymentInfo.pay_status}
+            }
+            const result =await cartCollection.updateMany(query,updatedDoc)
+            res.send(result)
+
         })
         // //test code
         // const currentDate = new Date('2023-11-30');
