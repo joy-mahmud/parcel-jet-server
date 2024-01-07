@@ -331,6 +331,14 @@ async function run() {
             // console.log(result)
 
         })
+        app.get('/mytotalBooking/:email',async(req,res)=>{
+            const email =req.params.email
+            const query = {email:email}
+            console.log(email)
+            const result = await cartCollection.find(query).toArray()
+           
+            res.send(result)
+        } )
         // get all the orders for admin only
         app.get('/orders', verifyToken, verifyAdmin, async (req, res) => {
             const result = await cartCollection.find().toArray()
@@ -494,13 +502,30 @@ async function run() {
 
 
 
-        //home stats
+        // stats
         app.get('/homeStats', async (req, res) => {
             const users = await userCollection.estimatedDocumentCount()
             const totalDelivery = await deliveredCollection.estimatedDocumentCount()
             const totalBooking = await cartCollection.estimatedDocumentCount()
 
             res.send({ users, totalBooking, totalDelivery })
+        })
+        app.get('/adminStats',verifyToken,verifyAdmin,async(req,res)=>{
+            const users = await userCollection.estimatedDocumentCount()
+            const totalDelivery = await deliveredCollection.estimatedDocumentCount()
+            const totalBooking = await cartCollection.estimatedDocumentCount()
+            const result = await paymentCollection.aggregate([
+                {
+                    $group:{
+                        _id:null,
+                        totalRevenue:{
+                            $sum:'$price'
+                        }
+                    }
+                }
+            ]).toArray()
+            const revenue = result.length>0?result[0].totalRevenue:0
+            res.send({users,totalDelivery,totalBooking,revenue})
         })
         //support related apis
         app.post('/getSupport', async (req, res) => {
@@ -602,7 +627,6 @@ async function run() {
             const paymentInfo = req.body
             const cartiIds = paymentInfo.cartIds
             const objectIds = cartiIds.map(id=>new ObjectId(id))
-            console.log(objectIds)
             const query = {_id:{
                 $in:objectIds
             }}
